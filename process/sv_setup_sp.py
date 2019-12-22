@@ -10,69 +10,22 @@ import os
 import csv
 
 
-def neigh_stats(G_proj, hexes, length, counter, rows, L, nodes):
+def neigh_stats(G_proj, hexes, length, rows, node, index):
     """
     This function is for multiprocessing.
     It uses hexes to calculate pop and intersection densiry for each sample point,
     it will create a subnetwork, and use that to intersect the hexes,
-    then read info from hexes.
+    then read info from the intersected hexes.
     -------
     average densities of population and intersections 
 
         G_proj {networkx} --  read from osmnx
         hexes {GeoDataFrame} -- hex
         length {int} -- distance to search 
-        counter {Value} -- counter for process times(Object from multiprocessing)
         rows {int} -- the number of rows to loop
-        L {Manager} -- list to save the outcome(Object from multiprocessing)
         nodes {list} -- the osmid of nodes
+        index {int} -- loop number
     """
-    dirname = os.path.abspath('')
-    tempcsv = os.path.join(dirname, 'data/temp.csv')
-    for node in nodes:
-        with counter.get_lock():
-            counter.value += 1
-            if counter.value % 100 == 0:
-                print('{0} / {1}'.format(counter.value, rows))
-            if counter.value % 2000 == 0:
-                with open(tempcsv, 'w', newline="") as f:
-                    x = list(L)
-                    writer = csv.writer(f)
-                    writer.writerows(x)
-        subgraph_proj = nx.ego_graph(G_proj,
-                                     node,
-                                     radius=length,
-                                     distance='length')
-        subgraph_gdf = ox.graph_to_gdfs(subgraph_proj,
-                                        nodes=False,
-                                        edges=True,
-                                        fill_edge_geometry=True)
-        del subgraph_proj
-
-        # select the hexes that intersect the subnetwork
-        if len(subgraph_gdf) > 0:
-            intersections = gpd.sjoin(hexes,
-                                      subgraph_gdf,
-                                      how='inner',
-                                      op='intersects')
-            del subgraph_gdf
-            # drop all rows where 'index_right' is nan
-            intersections = intersections[
-                intersections['index_right'].notnull()]
-            # remove rows where 'index' is duplicate
-            intersections = intersections.drop_duplicates(subset=['index'])
-            L.append([
-                node,
-                float(intersections['pop_per_sqkm'].mean()),
-                float(intersections['intersections_per_sqkm'].mean())
-            ])
-            del intersections
-            gc.collect()
-        else:
-            L.append([node])
-
-
-def neigh_stats1(G_proj, hexes, length, rows, node, index):
     if index % 100 == 0:
         print('{0} / {1}'.format(index, rows))
     subgraph_proj = nx.ego_graph(G_proj,
@@ -241,7 +194,7 @@ def neigh_stats_single(osmid, G_proj, hexes, length, counter, rows):
     It uses hexes to calculate pop and intersection densiry for each sample point,
     it will create a subnetwork, and use that to intersect the hexes,
     then read info from hexes.
-    
+
     Arguments:
         osmid {int} -- the id of node
         G_proj {networkx} --  graphml
@@ -249,7 +202,7 @@ def neigh_stats_single(osmid, G_proj, hexes, length, counter, rows):
         length {int} -- distance to search 
         counter {Value} -- counter for process times(Object from multiprocessing)
         rows {int} -- the number of rows to loop
-        
+
     Returns:
         tuple -- the pop and intersection density
     """
@@ -313,16 +266,16 @@ def readGraphml(path, config):
     Arguments:
         path {str} -- the path of the graphml
         config{dict} -- the dict read from json file
-        
+
     Returns:
         networkx -- projected networkx
     """
     if os.path.isfile(path):
-        print('being to read network.')
+        print('Start to read network.')
         return ox.load_graphml(path)
     else:
         # else read original graphml and reproject it
-        print('begin to reproject network')
+        print('Start to reproject network')
         graphml_path = os.path.join(dirname, config["folder"],
                                     config["graphmlName"])
         G = ox.load_graphml(graphml_path)
@@ -345,7 +298,7 @@ def createHexid(sp, hex):
     """
     if "hex_id" not in sp.columns.tolist():
         # get sample point dataframe columns
-        print("begin to create hex_id for sample points")
+        print("Start to create hex_id for sample points")
         samplePoint_column = sp.columns.tolist()
         samplePoint_column.append('index')
 
