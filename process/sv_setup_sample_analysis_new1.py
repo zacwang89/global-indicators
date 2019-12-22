@@ -91,8 +91,12 @@ def neigh_stats(G_proj, hexes, length, counter, rows, L, nodes, sindex=None):
 
 
 def neigh_stats1(G_proj, hexes, length, rows, node, index, sindex=None):
-    # if index % 100 == 0:
-    print('{0} / {1}'.format(index, rows))
+    # with counter.get_lock():
+    #     counter.value += 1
+    #     if counter.value % 100 == 0:
+    #         print('{0} / {1}'.format(counter.value, rows))
+    if index % 100 == 0:
+        print('{0} / {1}'.format(index, rows))
     subgraph_proj = nx.ego_graph(G_proj,
                                  node,
                                  radius=length,

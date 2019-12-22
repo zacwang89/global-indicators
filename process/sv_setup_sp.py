@@ -62,13 +62,46 @@ def neigh_stats(G_proj, hexes, length, counter, rows, L, nodes):
             # remove rows where 'index' is duplicate
             intersections = intersections.drop_duplicates(subset=['index'])
             L.append([
-                node, float(intersections['pop_per_sqkm'].mean()),
+                node,
+                float(intersections['pop_per_sqkm'].mean()),
                 float(intersections['intersections_per_sqkm'].mean())
             ])
             del intersections
             gc.collect()
         else:
             L.append([node])
+
+
+def neigh_stats1(G_proj, hexes, length, rows, node, index):
+    if index % 100 == 0:
+        print('{0} / {1}'.format(index, rows))
+    subgraph_proj = nx.ego_graph(G_proj,
+                                 node,
+                                 radius=length,
+                                 distance='length')
+    subgraph_gdf = ox.graph_to_gdfs(subgraph_proj,
+                                    nodes=False,
+                                    edges=True,
+                                    fill_edge_geometry=True)
+
+    # use subgraph to select interected hex250
+    if len(subgraph_gdf) > 0:
+        intersections = gpd.sjoin(hexes,
+                                  subgraph_gdf,
+                                  how='inner',
+                                  op='intersects')
+
+        # drop all rows where 'index_right' is nan
+        intersections = intersections[intersections['index_right'].notnull()]
+        # remove rows where 'index' is duplicate
+        intersections = intersections.drop_duplicates(subset=['index'])
+        return [
+            node,
+            float(intersections['pop_per_sqkm'].mean()),
+            float(intersections['intersections_per_sqkm'].mean())
+        ]
+    else:
+        return [node]
 
 
 def create_pdna_net(gdf_nodes, gdf_edges, predistance=500):
@@ -240,8 +273,7 @@ def neigh_stats_single(osmid, G_proj, hexes, length, counter, rows):
                                   how='inner',
                                   op='intersects')
         # drop all rows where 'index_right' is nan
-        intersections = intersections[
-            intersections['index_right'].notnull()]
+        intersections = intersections[intersections['index_right'].notnull()]
         # remove rows where 'index' is duplicate
         intersections = intersections.drop_duplicates(subset=['index'])
         return (intersections['pop_per_sqkm'].mean(),
@@ -250,14 +282,8 @@ def neigh_stats_single(osmid, G_proj, hexes, length, counter, rows):
         return (np.nan, np.nan)
 
 
-def neigh_stats_apply(osmid,
-                      G_proj,
-                      hexes,
-                      field_pop,
-                      field_intersection,
-                      length,
-                      counter,
-                      rows):
+def neigh_stats_apply(osmid, G_proj, hexes, field_pop, field_intersection,
+                      length, counter, rows):
     """
     use pandas apply() to calculate poplulation density and intersections
     Arguments:
@@ -273,8 +299,8 @@ def neigh_stats_apply(osmid,
     Returns:
         Series -- the result of pop and intersection density
     """
-    pop_per_sqkm, int_per_sqkm = neigh_stats_single(osmid, G_proj, hexes, length,
-                                                    counter, rows)
+    pop_per_sqkm, int_per_sqkm = neigh_stats_single(osmid, G_proj, hexes,
+                                                    length, counter, rows)
     return pd.Series({
         field_pop: pop_per_sqkm,
         field_intersection: int_per_sqkm
@@ -324,10 +350,7 @@ def createHexid(sp, hex):
         samplePoint_column.append('index')
 
         # join id from hex to each sample point
-        samplePointsData = gpd.sjoin(sp,
-                                     hex,
-                                     how='left',
-                                     op='within')
+        samplePointsData = gpd.sjoin(sp, hex, how='left', op='within')
         samplePointsData = samplePointsData[samplePoint_column].copy()
         samplePointsData.rename(columns={'index': 'hex_id'}, inplace=True)
         return samplePointsData

@@ -77,26 +77,41 @@ if __name__ == '__main__':
     if len(sys.argv) > 2:
         if sys.argv[2].lower() == "true":
             # method1: new way to use multiprocessing
+            # node_list = gdf_nodes_simple.osmid.tolist()
+            # node_list.sort()
+            # cpus = cpu_count()
+            # del gdf_nodes_simple
+            # with Manager() as manager:
+            #     L = manager.list()
+            #     processes = []
+            #     nodes = sss.split_list(node_list, cpus)
+            #     for i in range(cpus):
+            #         p = Process(target=sss.neigh_stats,
+            #                     args=(G_proj, hex250, distance, val, rows, L,
+            #                           nodes[i]))
+            #         p.start()
+            #         processes.append(p)
+            #     for p in processes:
+            #         p.join()
+            #     x = list(L)
+            #     print(len(L))
+            #     gdf_nodes_simple = pd.DataFrame(
+            #         x, columns=['osmid', pop_density, intersection_density])
+            # method1-1: other way to use multiprocessing
             node_list = gdf_nodes_simple.osmid.tolist()
             node_list.sort()
-            cpus = cpu_count()
-            del gdf_nodes_simple
-            with Manager() as manager:
-                L = manager.list()
-                processes = []
-                nodes = sss.split_list(node_list, cpus)
-                for i in range(cpus):
-                    p = Process(target=sss.neigh_stats,
-                                args=(G_proj, hex250, distance, val, rows, L,
-                                      nodes[i]))
-                    p.start()
-                    processes.append(p)
-                for p in processes:
-                    p.join()
-                x = list(L)
-                print(len(L))
-                gdf_nodes_simple = pd.DataFrame(
-                    x, columns=['osmid', pop_density, intersection_density])
+            pool = Pool(cpu_count())
+            result_objects = pool.starmap_async(
+                sss.neigh_stats1,
+                [(G_proj, hex250, distance, rows, node, index)
+                 for index, node in enumerate(node_list)],
+                chunksize=1000).get()
+            pool.close()
+            pool.join()
+            gdf_nodes_simple = pd.DataFrame(
+                result_objects,
+                columns=['osmid', pop_density, intersection_density])
+
     else:
         # method 2: single thread, use pandas apply()
         df_result = gdf_nodes_simple['osmid'].apply(
